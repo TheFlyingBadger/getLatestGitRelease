@@ -1,0 +1,10 @@
+APP:
+  ALLOW_PRERELEASE: true
+  OUTPUT_FOLDER: d:\my\local\path
+  DEBUG: false
+  KEEP_ARCHIVE: false
+GITHUB:
+  REPO_NAME: theRepoName
+  REPO_OWNER: theRepoOwner
+  REPO_ID: None # You can use the REPO_ID *INSTEAD* if you want
+  KEY: ghp_000000000000000000000000000000000000
