@@ -152,8 +152,12 @@ def releaseToDict (release):
     return outDict
 
 def getLatestRelease    (github_config_file         :   str
-                        ,github_config_file_type    :   str =   None
-                        ):
+                        ,**kwargs
+                        ) -> dict:
+
+    github_config_file_type     :   str     =   kwargs.get('github_config_file_type',None)
+    query_only                  :   bool    =   kwargs.get('query_only',False)
+    write_release_info          :   bool    =   kwargs.get('write_release_info',True)
 
     gitConfig  =   Config   (file_path  =   github_config_file
                             ,file_type  =   github_config_file_type
@@ -219,12 +223,13 @@ def getLatestRelease    (github_config_file         :   str
                         )
     gitConfig.save()
 
-    basePath            =   Path(basePath).resolve()
-    ic (f"Output Path : {basePath}")
+    if ((not  query_only) or write_release_info):
+        basePath            =   Path(basePath).resolve()
+        ic (f"Output Path : {basePath}")
 
-    Path(basePath).mkdir    (parents    =   True
-                            ,exist_ok   =   True
-                            )
+        Path(basePath).mkdir    (parents    =   True
+                                ,exist_ok   =   True
+                                )
 
     try:
         ic (f"Release count          = {len(releases)}")
@@ -241,80 +246,82 @@ def getLatestRelease    (github_config_file         :   str
             release["message"]          =   f"Release with tag \'{filteredReleases[0].tag_name}\' retrieved"
             if filteredReleases[0].prerelease:
                 release["message"]     +=   " (this is a PreRelease)"
-            release["downloaded_at"]    =   datetime.utcnow().strftime(DTMask)
 
-            with urlopen(release['zip_url']) as zipresp:
+            if not  query_only:
+                release["downloaded_at"]    =   datetime.utcnow().strftime(DTMask)
 
-                theBytes                     =   zipresp.read()
+                with urlopen(release['zip_url']) as zipresp:
 
-                if keepArchive:
-                    releaseFolder   =   basePath.joinpath('releases',repo.owner,repo.name)
-                    Path(releaseFolder).mkdir       (parents    =   True
-                                                    ,exist_ok   =   True
-                                                    )
-                    release["zip_file_name"]     =   str(releaseFolder.joinpath(f"{release['tag_name']}.zip"))
-                    with open (release["zip_file_name"],'wb') as f:
-                        f.write(theBytes)
+                    theBytes                     =   zipresp.read()
 
-                    def getDT (dateStr : str) -> datetime:
-                        try:
-                            retval = datetime.strptime(dateStr, DTMask)
-                        except ValueError:
-                            retval = datetime.strptime(dateStr, DTMask[:-2])
-                        try:
-                            retval  =   retval.astimezone(tz=None)
-                        except:
-                            ...
-                        return retval
+                    if keepArchive:
+                        releaseFolder   =   basePath.joinpath('releases',repo.owner,repo.name)
+                        Path(releaseFolder).mkdir       (parents    =   True
+                                                        ,exist_ok   =   True
+                                                        )
+                        release["zip_file_name"]     =   str(releaseFolder.joinpath(f"{release['tag_name']}.zip"))
+                        with open (release["zip_file_name"],'wb') as f:
+                            f.write(theBytes)
 
-                    setFileDateTimes    (filePath   =   release["zip_file_name"]
-                                        ,datetimes  =   dateTruple  (created    =   getDT(release['created_at'])
-                                                                    ,modified   =   getDT(release['published_at'])
-                                                                    ,accessed   =   datetime.now()
-                                                                    )
-                                        )
+                        def getDT (dateStr : str) -> datetime:
+                            try:
+                                retval = datetime.strptime(dateStr, DTMask)
+                            except ValueError:
+                                retval = datetime.strptime(dateStr, DTMask[:-2])
+                            try:
+                                retval  =   retval.astimezone(tz=None)
+                            except:
+                                ...
+                            return retval
 
-                else:
-                    release["zip_file_name"]     =   None
-
-            release["zip_file_size"]     =   DataSize(f"{len(theBytes)}B").__format__('m')
-            release["zip_file_bytes"]    =   len(theBytes)
-
-            with ZipFile(BytesIO(theBytes)) as zfile:
-                release['files']    =   []
-                for f in zfile.filelist:
-                    thisPath    =   basePath
-                    origPath    =   Path(f.filename)
-
-                    for p in list(origPath.parts[1:]):
-                        thisPath    =   thisPath.joinpath(p)
-
-                    if origPath.parts[-1] == '.gitignore':
-                        # Ignore these files
-                        ...
-                    elif f.is_dir ():
-                        # Creating folder
-                        Path(thisPath).mkdir    (parents    =   True
-                                                ,exist_ok   =   True
-                                                )
-                    else:
-                        fileTime = datetime(*f.date_time)
-                        d = dict()
-                        d["name"]   =   str(thisPath)
-                        d["size"]   =   DataSize(f"{f.file_size}B").__format__('m')
-                        d["bytes"]  =   f.file_size
-                        d["date"]   =   fileTime.strftime(DTMask)
-
-                        release['files'].append (d)
-
-                        with open(thisPath, "wb") as thisFile:
-                            thisFile.write(zfile.read (f))
-                        setFileDateTimes    (filePath   =   thisPath
-                                            ,datetimes  =   dateTruple  (created    =   fileTime
-                                                                        ,modified   =   fileTime
-                                                                        ,accessed   =   fileTime
+                        setFileDateTimes    (filePath   =   release["zip_file_name"]
+                                            ,datetimes  =   dateTruple  (created    =   getDT(release['created_at'])
+                                                                        ,modified   =   getDT(release['published_at'])
+                                                                        ,accessed   =   datetime.now()
                                                                         )
                                             )
+
+                    else:
+                        release["zip_file_name"]     =   None
+
+                release["zip_file_size"]     =   DataSize(f"{len(theBytes)}B").__format__('m')
+                release["zip_file_bytes"]    =   len(theBytes)
+
+                with ZipFile(BytesIO(theBytes)) as zfile:
+                    release['files']    =   []
+                    for f in zfile.filelist:
+                        thisPath    =   basePath
+                        origPath    =   Path(f.filename)
+
+                        for p in list(origPath.parts[1:]):
+                            thisPath    =   thisPath.joinpath(p)
+
+                        if origPath.parts[-1] == '.gitignore':
+                            # Ignore these files
+                            ...
+                        elif f.is_dir ():
+                            # Creating folder
+                            Path(thisPath).mkdir    (parents    =   True
+                                                    ,exist_ok   =   True
+                                                    )
+                        else:
+                            fileTime = datetime(*f.date_time)
+                            d = dict()
+                            d["name"]   =   str(thisPath)
+                            d["size"]   =   DataSize(f"{f.file_size}B").__format__('m')
+                            d["bytes"]  =   f.file_size
+                            d["date"]   =   fileTime.strftime(DTMask)
+
+                            release['files'].append (d)
+
+                            with open(thisPath, "wb") as thisFile:
+                                thisFile.write(zfile.read (f))
+                            setFileDateTimes    (filePath   =   thisPath
+                                                ,datetimes  =   dateTruple  (created    =   fileTime
+                                                                            ,modified   =   fileTime
+                                                                            ,accessed   =   fileTime
+                                                                            )
+                                                )
     except Warning as w:
         pass
 
@@ -323,18 +330,23 @@ def getLatestRelease    (github_config_file         :   str
         if "message" in release and release["message"]:
             ic (release["message"])
 
-        # write data out from what we've got here. use the Config object to write it
-        yamlDump    =   Config  (file_path          =   basePath.joinpath(f"{repo.owner}.{repo.name}.release.yaml")
-                                ,raiseFileNotFound  =   False
-                                ,config             =   {"config"           :   gitConfig.get('APP')
-                                                        ,"repo"             :   dict(repo)
-                                                        ,"release"          :   release
-                                                        ,"allReleases"      :   releasesToDictList(releases)
-                                                        }
-                                )
-        yamlDump.set('config/OUTPUT_FOLDER',str(basePath))
-        yamlDump.save()
-        yamlDump = None
+        releaseDict =   {"config"           :   gitConfig.get('APP')
+                        ,"repo"             :   dict(repo)
+                        ,"release"          :   release
+                        ,"allReleases"      :   releasesToDictList(releases)
+                        }
+
+        if write_release_info:
+            # write data out from what we've got here. use the Config object to write it
+            yamlDump    =   Config  (file_path          =   basePath.joinpath(f"{repo.owner}.{repo.name}.release.yaml")
+                                    ,raiseFileNotFound  =   False
+                                    ,config             =   releaseDict
+                                    )
+            yamlDump.set('config/OUTPUT_FOLDER',str(basePath))
+            yamlDump.save()
+            yamlDump = None
+
+    return releaseDict
 
 if __name__ == '__main__':
     ...
