@@ -1,14 +1,14 @@
-"# getLatestGitRelease"
+# getLatestGitRelease
 
 will grab the latest github release and pull it down locally, unzipping it into the specified folder
 
-###Usage
+### Usage
 
     getLatestRelease    (github_config_file         =   '.\getLatest.example.yaml'
                         ,github_config_file_type    =   'YAML'
                         )
 
-####the config file (can be YAML, JSON, XML, INI)
+#### the config file (can be YAML, JSON, XML, INI)
 
     APP:
         ALLOW_PRERELEASE: true
